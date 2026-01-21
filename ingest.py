@@ -253,6 +253,31 @@ def extract_chunk(image_path: Path, chunk_name: str, prompt: str, delay: float =
         return {"image": str(image_path), "chunk": chunk_name, "success": False, "error": str(e), "time": elapsed}
 
 
+def flush_data(db, cid, did, chunk_name, data, page_num):
+    """Flush extracted data based on chunk type."""
+    if chunk_name == "market":
+        db.flush_market(cid, did, data)
+    elif chunk_name == "shareholding":
+        db.flush_shareholding(cid, did, data)
+    elif chunk_name == "forecasts":
+        db.flush_forecasts(cid, did, data)
+    elif chunk_name == "qualitative":
+        db.flush_qualitative(cid, did, data, page_num)
+    elif chunk_name in ["quarterly_pnl", "annual_pnl"]:
+        db.flush_time_series(cid, did, chunk_name, data, "cr")
+    elif chunk_name == "balance_sheet":
+        db.flush_time_series(cid, did, "balance_sheet", data, "cr")
+    elif chunk_name == "cash_flow":
+        db.flush_time_series(cid, did, "cash_flow", data, "cr")
+    elif chunk_name == "ratios":
+        db.flush_time_series(cid, did, "ratios", data, "")
+    elif chunk_name == "sotp_valuation":
+        db.flush_sotp(cid, did, data)
+    elif chunk_name == "rating_history":
+        db.flush_rating_history(cid, did, data)
+    log(f"FLUSH {chunk_name}")
+
+
 def main():
     print("=" * 60)
     print("Full PDF Ingestion Pipeline")
@@ -271,25 +296,43 @@ def main():
     image_dir = Path("data/images")
     image_dir.mkdir(parents=True, exist_ok=True)
     
-    pdfs = sorted(pdf_dir.glob("*.pdf"))
-    if not pdfs:
-        print("No PDFs found in data/pdfs/")
-        return
+    # Use existing images grouped by hash prefix
+    existing_images = sorted(image_dir.glob("*_page_*.png"))
+    if existing_images:
+        print(f"Found {len(existing_images)} existing images")
+        # Group by hash prefix
+        image_groups = {}
+        for img in existing_images:
+            prefix = img.stem.split("_page_")[0]
+            if prefix not in image_groups:
+                image_groups[prefix] = []
+            image_groups[prefix].append(img)
+        # Sort each group by page number
+        for prefix in image_groups:
+            image_groups[prefix] = sorted(image_groups[prefix], key=lambda x: int(x.stem.split("_page_")[1]))
+        print(f"Image groups: {len(image_groups)}")
+    else:
+        image_groups = {}
     
+    # Try converting any PDFs without images
+    pdfs = sorted(pdf_dir.glob("*.pdf"))
     print(f"Found {len(pdfs)} PDFs")
     
-    # Convert all PDFs to images
-    print("\n--- Converting PDFs to Images ---")
-    pdf_images = {}
     for pdf in pdfs:
         try:
             images = convert_pdf_to_images(pdf, image_dir)
-            pdf_images[pdf] = images
+            if images:
+                prefix = images[0].stem.split("_page_")[0]
+                image_groups[prefix] = images
         except Exception as e:
-            log(f"Skip {pdf.name}: {str(e)[:50]}")
+            pass  # Skip silently, we'll use existing images
     
-    total_images = sum(len(imgs) for imgs in pdf_images.values())
+    total_images = sum(len(imgs) for imgs in image_groups.values())
     print(f"Total images: {total_images}")
+    
+    if not image_groups:
+        print("No images to process!")
+        return
     
     # Build extraction tasks for all pages
     print("\n--- Building Extraction Tasks ---")
@@ -297,13 +340,13 @@ def main():
     delay = 0
     stagger = 2  # seconds between task starts
     
-    for pdf, images in pdf_images.items():
+    for prefix, images in image_groups.items():
         for page_num, image_path in enumerate(images, 1):
             page_key = f"page{page_num}" if page_num <= 4 else None
             if page_key and page_key in CHUNKS:
                 for chunk_name, prompt in CHUNKS[page_key].items():
                     tasks.append({
-                        "pdf": pdf,
+                        "prefix": prefix,
                         "image": image_path,
                         "page": page_num,
                         "chunk": chunk_name,
@@ -316,15 +359,20 @@ def main():
     print(f"Stagger: {stagger}s between starts")
     print(f"Estimated time: {delay}s")
     
+    if not tasks:
+        print("No tasks to run!")
+        return
+    
     db = Database()
     
-    # Track results per PDF for flushing
-    pdf_info = {str(pdf): {"filename": pdf.name, "company_id": None, "doc_id": None} for pdf in pdfs}
+    # Track results per image group for flushing
+    group_info = {prefix: {"filename": f"{prefix}.pdf", "company_id": None, "doc_id": None} for prefix in image_groups}
     
     print("\n--- Extracting Data ---")
     start_total = time.time()
     completed = 0
     failed = 0
+    pending_flushes = []  # Store results that need basic first
     
     with ThreadPoolExecutor(max_workers=min(50, len(tasks))) as executor:
         futures = {
@@ -335,10 +383,10 @@ def main():
         for future in as_completed(futures):
             task = futures[future]
             result = future.result()
-            pdf_key = str(task["pdf"])
+            prefix = task["prefix"]
             chunk_name = result["chunk"]
             page_num = task["page"]
-            info = pdf_info[pdf_key]
+            info = group_info[prefix]
             
             if not result["success"]:
                 failed += 1
@@ -353,31 +401,15 @@ def main():
                 info["company_id"] = company_id
                 info["doc_id"] = doc_id
                 log(f"FLUSH basic → {data.get('company_name', 'unknown')[:20]}")
+                # Process any pending flushes for this group
+                for pf in pending_flushes[:]:
+                    if pf["prefix"] == prefix:
+                        flush_data(db, info["company_id"], info["doc_id"], pf["chunk"], pf["data"], pf["page"])
+                        pending_flushes.remove(pf)
             elif not info["company_id"]:
-                continue  # Skip if basic not processed yet
+                pending_flushes.append({"prefix": prefix, "chunk": chunk_name, "data": data, "page": page_num})
             else:
-                cid, did = info["company_id"], info["doc_id"]
-                if chunk_name == "market":
-                    db.flush_market(cid, did, data)
-                elif chunk_name == "shareholding":
-                    db.flush_shareholding(cid, did, data)
-                elif chunk_name == "forecasts":
-                    db.flush_forecasts(cid, did, data)
-                elif chunk_name == "qualitative":
-                    db.flush_qualitative(cid, did, data, page_num)
-                elif chunk_name in ["quarterly_pnl", "annual_pnl"]:
-                    db.flush_time_series(cid, did, chunk_name, data, "cr")
-                elif chunk_name == "balance_sheet":
-                    db.flush_time_series(cid, did, "balance_sheet", data, "cr")
-                elif chunk_name == "cash_flow":
-                    db.flush_time_series(cid, did, "cash_flow", data, "cr")
-                elif chunk_name == "ratios":
-                    db.flush_time_series(cid, did, "ratios", data, "")
-                elif chunk_name == "sotp_valuation":
-                    db.flush_sotp(cid, did, data)
-                elif chunk_name == "rating_history":
-                    db.flush_rating_history(cid, did, data)
-                log(f"FLUSH {chunk_name}")
+                flush_data(db, info["company_id"], info["doc_id"], chunk_name, data, page_num)
     
     total_time = time.time() - start_total
     stats = db.get_stats()
