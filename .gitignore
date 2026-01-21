@@ -1,0 +1,79 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data directories (exclude generated/temporary files)
+data/images/
+data/database/*.db
+data/database/*.db-journal
+data/database/*.db-wal
+data/database/*.db-shm
+
+# Logs
+*.log
+data/errors.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Keep directory structure but ignore contents
+data/images/*
+!data/images/.gitkeep
+data/database/*
+!data/database/.gitkeep
+
+# Optional: Ignore PDFs if they're large/sensitive
+# Uncomment if you don't want to commit PDFs to git
+# data/pdfs/*.pdf
+
+# Keep schema and manifest in version control
+!data/schema.json
+!data/manifest.json
+!data/vector_store_config.json

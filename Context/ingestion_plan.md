@@ -9,15 +9,14 @@ This document outlines the complete implementation plan for the data ingestion p
 - **Schema Storage:** JSON file (`data/schema.json`) for easy inspection, version control, and portability
 - **PDF Storage:** PDFs stored in repo at `data/pdfs/` for now
   - **Future Optimization:** Migrate to blob storage (investigate free Python options like MinIO local, or cloud-agnostic solutions)
-- **Image Quality:** High resolution (300 DPI) for maximum accuracy with GPT-5 Vision
+- **Image Quality:** High resolution (300 DPI) for maximum accuracy with GPT-5
 - **Processing Mode:** Batch concurrent processing (5-10 parallel API calls) for performance
 - **Incremental Updates:** Support adding new PDFs without reprocessing via manifest tracking
 - **Error Handling:** Skip failed PDFs, log errors, continue processing remaining files
 
 ### AI Models
-- **Vision Tasks:** GPT-5 Vision for PDF page analysis and data extraction
-- **Text Tasks:** GPT-5 for schema evolution, synonym detection, and structured reasoning
-- **Note:** Using latest OpenAI models (GPT-5 family, 2026)
+- **All Tasks:** GPT-5 (multimodal) for PDF page analysis, data extraction, schema evolution, synonym detection, and structured reasoning
+- **Note:** Using GPT-5 (model ID: `gpt-5`) - multimodal model with native vision and text capabilities
 
 ---
 
@@ -129,10 +128,10 @@ async def convert_pdf_to_images(
 **Process:**
 1. Select first 3-5 PDFs for initial schema
 2. Convert to images
-3. Use async batch processing to send pages to GPT-5 Vision
+3. Use async batch processing to send pages to GPT-5
 4. Aggregate results into unified schema
 
-**GPT-5 Vision Prompt Template:**
+**GPT-5 Prompt Template (with image input):**
 ```
 You are analyzing a financial equity research document from an Indian investment service provider.
 
@@ -396,7 +395,7 @@ class QualitativeData(BaseModel):
 
 #### Step 5.2: Quantitative Data Extraction
 
-**GPT-5 Vision Prompt Template:**
+**GPT-5 Prompt Template (with image input):**
 ```
 You are extracting structured financial data from an equity research document.
 
@@ -425,7 +424,7 @@ async def extract_quantitative_data_batch(
     batch_size: int = 5
 ) -> Dict[str, Any]:
     """
-    Extract quantitative data from PDF using GPT-5 Vision.
+    Extract quantitative data from PDF using GPT-5.
     Uses OpenAI Structured Outputs for guaranteed JSON schema compliance.
 
     Returns aggregated data from all pages.
@@ -435,7 +434,7 @@ async def extract_quantitative_data_batch(
 **OpenAI API Usage:**
 ```python
 response = await client.chat.completions.create(
-    model="gpt-5-vision",  # or appropriate GPT-5 vision model name
+    model="gpt-5",  # GPT-5 is multimodal
     messages=[
         {
             "role": "user",
@@ -458,7 +457,7 @@ response = await client.chat.completions.create(
 
 #### Step 5.3: Qualitative Data Extraction
 
-**GPT-5 Vision Prompt Template:**
+**GPT-5 Prompt Template (with image input):**
 ```
 You are extracting qualitative text content from a financial research document.
 
@@ -1022,6 +1021,317 @@ if __name__ == "__main__":
 
 ---
 
+### **Phase 9: Data Validation & Verification**
+
+**Purpose:** Validate that all data was correctly ingested and ensure data integrity before query workflow development.
+
+**Module:** `src/ingestion/validator.py`
+
+#### Validation Checks
+
+**1. PDF Processing Validation**
+```python
+class IngestionValidator:
+    def __init__(self, config: Config):
+        self.config = config
+        self.db = DatabaseManager(config.database_path)
+        self.manifest = ManifestManager(config.manifest_path)
+
+    def validate_pdf_processing(self) -> Dict[str, Any]:
+        """
+        Verify all PDFs were processed successfully.
+
+        Returns validation report with:
+        - Total PDFs in directory
+        - Successfully processed count
+        - Failed PDFs list
+        - Missing PDFs (in directory but not in manifest)
+        """
+```
+
+**Checks:**
+- Count PDFs in `data/pdfs/` directory
+- Compare with manifest records
+- Identify any PDFs not processed
+- List failed PDFs with error reasons
+- Verify page counts match (PDF pages vs processed images)
+
+**2. Database Integrity Validation**
+```python
+    def validate_database_integrity(self) -> Dict[str, Any]:
+        """
+        Verify database structure and data consistency.
+
+        Checks:
+        - All tables exist with correct schema
+        - Foreign key integrity
+        - No orphaned records
+        - Data type consistency
+        - Required fields populated
+        """
+```
+
+**Checks:**
+- Verify all tables exist (documents, companies, metrics)
+- Check foreign key relationships (no orphaned metrics)
+- Validate required fields (company_name, ticker not null where expected)
+- Check for duplicate companies/tickers
+- Verify metric values are within reasonable ranges
+- Count total records per table
+
+**3. Schema Completeness Validation**
+```python
+    def validate_schema_completeness(self) -> Dict[str, Any]:
+        """
+        Verify schema was properly generated and covers all documents.
+
+        Checks:
+        - Schema file exists and is valid JSON
+        - All processed PDFs listed in schema.processed_for_schema
+        - Field statistics make sense (>0 fields in each category)
+        - Synonym mappings are bidirectional
+        """
+```
+
+**Checks:**
+- Schema JSON is valid and loadable
+- Minimum field count met (e.g., >20 total fields)
+- All three categories present (quantitative, qualitative, metadata)
+- Each field has required attributes (type, data_type)
+- Synonym lists don't have duplicates
+- Statistics match actual field counts
+
+**4. Data Extraction Validation**
+```python
+    def validate_data_extraction(self) -> Dict[str, Any]:
+        """
+        Verify extracted data quality and completeness.
+
+        Checks:
+        - Each company has minimum data points
+        - Critical fields populated (revenue, company name, sector)
+        - Data distribution looks reasonable (no extreme outliers)
+        - Date fields are valid
+        """
+```
+
+**Checks:**
+- Each document has associated company record
+- Each company has minimum number of metrics (e.g., >5)
+- Critical fields like company_name are never null
+- Numeric values are positive where expected (revenue, profit)
+- Date fields are in valid format
+- No suspiciously large gaps in data
+
+**5. Vector Store Validation**
+```python
+    def validate_vector_store(self) -> Dict[str, Any]:
+        """
+        Verify vector store was populated correctly.
+
+        Checks:
+        - Vector store exists and is accessible
+        - File count matches expected (one per PDF or per chunk)
+        - Can retrieve sample chunks
+        - Metadata is properly formatted
+        """
+```
+
+**Checks:**
+- Vector store ID exists in config
+- Can connect to vector store via OpenAI API
+- File count > 0
+- Sample retrieval works (test search)
+- Chunk count matches expected range (>X chunks total)
+- Each document contributed qualitative data
+
+**6. Cross-Validation Checks**
+```python
+    def validate_cross_references(self) -> Dict[str, Any]:
+        """
+        Verify consistency across different storage systems.
+
+        Checks:
+        - Company count matches in database and manifest
+        - Document IDs are consistent
+        - No data in database for failed PDFs
+        - Qualitative and quantitative data for same companies
+        """
+```
+
+**Checks:**
+- Number of companies in DB matches manifest
+- Each company in DB has corresponding document
+- Document IDs sequential and no gaps
+- Companies with quantitative data also have qualitative data
+- Ticker symbols consistent across all systems
+
+#### Validation Report Generation
+
+**Function:**
+```python
+    def generate_validation_report(self) -> Dict[str, Any]:
+        """
+        Run all validation checks and generate comprehensive report.
+
+        Returns:
+            Validation report with pass/fail status, statistics, and issues
+        """
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "overall_status": "UNKNOWN",
+            "checks": {
+                "pdf_processing": self.validate_pdf_processing(),
+                "database_integrity": self.validate_database_integrity(),
+                "schema_completeness": self.validate_schema_completeness(),
+                "data_extraction": self.validate_data_extraction(),
+                "vector_store": self.validate_vector_store(),
+                "cross_references": self.validate_cross_references(),
+            },
+            "summary": {},
+            "issues": [],
+            "recommendations": []
+        }
+
+        # Determine overall status
+        report["overall_status"] = self._compute_status(report["checks"])
+        report["summary"] = self._generate_summary(report["checks"])
+        report["issues"] = self._collect_issues(report["checks"])
+        report["recommendations"] = self._generate_recommendations(report["issues"])
+
+        return report
+```
+
+**Report Output Format:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Data Ingestion Validation Report                            │
+├─────────────────────────────────────────────────────────────┤
+│ Timestamp: 2026-01-21 16:30:00                              │
+│ Overall Status: ✓ PASSED                                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│ PDF Processing                                   ✓ PASSED   │
+│   └─ Total PDFs: 20                                         │
+│   └─ Processed: 18                                          │
+│   └─ Failed: 2                                              │
+│   └─ Coverage: 90%                                          │
+│                                                              │
+│ Database Integrity                               ✓ PASSED   │
+│   └─ Documents: 18                                          │
+│   └─ Companies: 18                                          │
+│   └─ Metrics: 1,247                                         │
+│   └─ Foreign Keys: Valid                                    │
+│   └─ Orphaned Records: 0                                    │
+│                                                              │
+│ Schema Completeness                              ✓ PASSED   │
+│   └─ Total Fields: 47                                       │
+│   └─ Quantitative: 23                                       │
+│   └─ Qualitative: 18                                        │
+│   └─ Metadata: 6                                            │
+│   └─ PDFs in Schema: 18/18                                  │
+│                                                              │
+│ Data Extraction Quality                          ✓ PASSED   │
+│   └─ Avg Metrics/Company: 69                                │
+│   └─ Companies with <5 Metrics: 0                           │
+│   └─ Critical Fields Populated: 100%                        │
+│   └─ Data Anomalies: 0                                      │
+│                                                              │
+│ Vector Store                                     ✓ PASSED   │
+│   └─ Vector Store ID: vs_abc123xyz                          │
+│   └─ Files: 18                                              │
+│   └─ Chunks: 342                                            │
+│   └─ Test Search: Success                                   │
+│                                                              │
+│ Cross-Reference Checks                           ✓ PASSED   │
+│   └─ DB/Manifest Consistency: Match                         │
+│   └─ Document ID Gaps: None                                 │
+│   └─ Quantitative/Qualitative Coverage: 100%                │
+│                                                              │
+├─────────────────────────────────────────────────────────────┤
+│ Issues Found: 2                                              │
+├─────────────────────────────────────────────────────────────┤
+│ ⚠ WARNING: 2 PDFs failed processing                         │
+│   - report_abc_ltd_2024.pdf: API timeout                    │
+│   - report_failed_corp.pdf: Corrupted PDF                   │
+│                                                              │
+├─────────────────────────────────────────────────────────────┤
+│ Recommendations:                                             │
+├─────────────────────────────────────────────────────────────┤
+│ 1. Retry failed PDFs using: python ingest.py --retry-failed │
+│ 2. Verify corrupted PDF file: report_failed_corp.pdf        │
+│ 3. Consider manual review of extracted financial data       │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+
+Validation Complete: System is ready for query workflow development.
+```
+
+**Save Report:**
+- Save JSON report to `data/validation_report.json`
+- Save human-readable report to `data/validation_report.txt`
+- Include timestamp for tracking multiple validation runs
+
+#### Integration with Ingestion CLI
+
+**Add to `ingest.py`:**
+```python
+# Automatic validation after full pipeline
+if args.full:
+    await run_full_pipeline(config)
+    print("\n🔍 Running validation checks...")
+    validator = IngestionValidator(config)
+    report = validator.generate_validation_report()
+    validator.print_report(report)
+    validator.save_report(report)
+
+# Manual validation command
+if args.validate:
+    validator = IngestionValidator(config)
+    report = validator.generate_validation_report()
+    validator.print_report(report)
+    validator.save_report(report)
+
+    # Exit with error code if validation failed
+    if report["overall_status"] == "FAILED":
+        sys.exit(1)
+```
+
+**CLI Commands:**
+```bash
+# Automatic validation after full ingestion
+python ingest.py --full
+# (validation runs automatically at the end)
+
+# Manual validation anytime
+python ingest.py --validate
+
+# Validation with detailed output
+python ingest.py --validate --verbose
+```
+
+#### Critical Validation Thresholds
+
+**Configurable in `config.py`:**
+```python
+@property
+def min_metrics_per_company(self) -> int:
+    """Minimum number of metrics required per company."""
+    return int(os.getenv("MIN_METRICS_PER_COMPANY", "5"))
+
+@property
+def min_schema_fields(self) -> int:
+    """Minimum total fields in schema."""
+    return int(os.getenv("MIN_SCHEMA_FIELDS", "20"))
+
+@property
+def required_success_rate(self) -> float:
+    """Minimum percentage of PDFs that must process successfully."""
+    return float(os.getenv("REQUIRED_SUCCESS_RATE", "0.8"))  # 80%
+```
+
+---
+
 ## Implementation Checklist
 
 ### Phase 1: Setup
@@ -1041,7 +1351,7 @@ if __name__ == "__main__":
 
 ### Phase 3: Schema Generation
 - [ ] Implement initial field discovery
-- [ ] Create GPT-5 Vision prompts for field extraction
+- [ ] Create GPT-5 prompts for field extraction (with image inputs)
 - [ ] Implement batch processing
 - [ ] Test with 3-5 sample PDFs
 - [ ] Implement schema JSON structure
@@ -1092,14 +1402,522 @@ if __name__ == "__main__":
 - [ ] Test all CLI commands
 - [ ] Create user documentation
 
-### Testing & Validation
-- [ ] Test with all 20 PDFs
-- [ ] Validate schema completeness
-- [ ] Validate data accuracy (spot check)
-- [ ] Test error handling (corrupt PDF, API failures)
-- [ ] Test incremental updates
-- [ ] Performance testing (batch sizes, concurrent calls)
-- [ ] Document any issues or limitations
+### Phase 9: Data Validation & Verification
+- [ ] Implement `validator.py`
+- [ ] Implement PDF processing validation
+- [ ] Implement database integrity checks
+- [ ] Implement schema completeness validation
+- [ ] Implement data extraction quality checks
+- [ ] Implement vector store validation
+- [ ] Implement cross-reference validation
+- [ ] Create validation report generator
+- [ ] Integrate validation with CLI (--validate, auto-run after --full)
+- [ ] Set validation thresholds in config
+- [ ] Test validation with various scenarios (partial failures, missing data)
+- [ ] Document validation criteria and thresholds
+
+---
+
+## Agent Query Workflow Design (Future Phase)
+
+**Note:** This section outlines the query/chat agent design that will be implemented AFTER ingestion pipeline is complete. Included here for architectural completeness.
+
+### Overview
+
+The agent uses **OpenAI Function Calling (Tools)** to interact with the ingested data. Instead of generating SQL as text, GPT-5 directly calls Python functions that execute queries and return results.
+
+### Function Calling Architecture
+
+**Why Function Calling?**
+- ✅ More reliable than text-based SQL generation
+- ✅ Structured input/output validation via Pydantic
+- ✅ Better error handling and retry logic
+- ✅ GPT-5 can chain multiple tool calls
+- ✅ Easier to log and debug
+- ✅ Supports complex multi-step queries
+
+**OpenAI Tools API:**
+```python
+# Tools are defined with JSON schema
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "query_database",
+            "description": "Execute SQL query against financial database",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sql_query": {"type": "string", "description": "SQL SELECT query"},
+                    "explanation": {"type": "string", "description": "What this query retrieves"}
+                },
+                "required": ["sql_query"]
+            }
+        }
+    },
+    # ... more tools
+]
+
+# GPT-5 decides which tools to call
+response = client.chat.completions.create(
+    model="gpt-5",
+    messages=conversation_history,
+    tools=tools,
+    tool_choice="auto"  # GPT-5 decides when to use tools
+)
+```
+
+### Tool Definitions
+
+**Module:** `src/agent/tools.py`
+
+#### 1. Database Query Tool
+
+```python
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
+
+class QueryDatabaseInput(BaseModel):
+    """Input schema for database query tool."""
+    sql_query: str = Field(description="SQL SELECT query to execute")
+    explanation: str = Field(description="Human-readable explanation of what this query retrieves")
+
+def query_database(sql_query: str, explanation: str) -> Dict[str, Any]:
+    """
+    Execute SQL query against SQLite database.
+
+    This tool allows the agent to retrieve quantitative financial data.
+    The schema includes:
+    - companies table: company_name, ticker, sector, industry
+    - metrics table: field_name, value, unit, date_context
+    - documents table: filename, processed_date, status
+
+    Returns:
+        {
+            "success": True/False,
+            "results": List of dicts (rows),
+            "row_count": int,
+            "columns": List of column names,
+            "error": Optional error message
+        }
+    """
+    try:
+        db = DatabaseManager()
+
+        # Security: validate it's a SELECT query
+        if not sql_query.strip().upper().startswith("SELECT"):
+            return {
+                "success": False,
+                "error": "Only SELECT queries are allowed",
+                "results": []
+            }
+
+        # Execute query
+        results = db.execute_query(sql_query)
+
+        return {
+            "success": True,
+            "results": results,
+            "row_count": len(results),
+            "columns": list(results[0].keys()) if results else [],
+            "query_explanation": explanation
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "results": []
+        }
+```
+
+#### 2. Document Search Tool
+
+```python
+class SearchDocumentsInput(BaseModel):
+    """Input schema for document search tool."""
+    query: str = Field(description="Search query for finding relevant document passages")
+    max_results: int = Field(default=5, description="Maximum number of results to return")
+    filter_by_company: Optional[str] = Field(default=None, description="Filter results to specific company")
+
+def search_documents(query: str, max_results: int = 5, filter_by_company: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Semantic search in vector store for qualitative information.
+
+    This tool allows the agent to find relevant text passages from equity research reports
+    for qualitative questions (business overview, risks, management commentary, etc.)
+
+    Returns:
+        {
+            "success": True/False,
+            "results": [
+                {
+                    "text": "Relevant passage...",
+                    "company_name": "XYZ Corp",
+                    "document": "xyz_report.pdf",
+                    "page": 3,
+                    "field_name": "business_overview",
+                    "score": 0.85
+                },
+                ...
+            ],
+            "result_count": int
+        }
+    """
+    try:
+        vector_store = VectorStoreManager()
+
+        # Build metadata filter
+        metadata_filter = {}
+        if filter_by_company:
+            metadata_filter["company_name"] = filter_by_company
+
+        # Search using OpenAI file_search
+        results = vector_store.search(
+            query=query,
+            max_results=max_results,
+            metadata_filter=metadata_filter
+        )
+
+        return {
+            "success": True,
+            "results": results,
+            "result_count": len(results),
+            "query": query
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "results": []
+        }
+```
+
+#### 3. Schema Retrieval Tool
+
+```python
+class GetSchemaInput(BaseModel):
+    """Input schema for schema retrieval tool."""
+    category: Optional[str] = Field(default=None, description="Filter by category: quantitative, qualitative, or metadata")
+
+def get_schema(category: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Retrieve schema information including field names, types, and synonyms.
+
+    This helps the agent understand what data is available and construct queries.
+
+    Returns:
+        {
+            "success": True,
+            "fields": {
+                "revenue_fy24": {
+                    "type": "quantitative",
+                    "data_type": "float",
+                    "unit": "INR_crore",
+                    "synonyms": ["revenue_2024", "fy24_revenue"],
+                    "description": "..."
+                },
+                ...
+            },
+            "statistics": {"total_fields": 47, ...}
+        }
+    """
+```
+
+#### 4. Company List Tool
+
+```python
+def get_company_list(sector: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get list of all companies in the corpus.
+
+    Useful for the agent to know which companies are available.
+
+    Returns:
+        {
+            "success": True,
+            "companies": [
+                {
+                    "name": "XYZ Corporation",
+                    "ticker": "XYZ",
+                    "sector": "Technology",
+                    "industry": "Cloud Infrastructure"
+                },
+                ...
+            ],
+            "count": 18
+        }
+    """
+```
+
+#### 5. Field Values Tool
+
+```python
+class GetFieldValuesInput(BaseModel):
+    """Input schema for getting field values."""
+    company_name: str = Field(description="Name or ticker of the company")
+    field_names: List[str] = Field(description="List of field names to retrieve")
+
+def get_field_values(company_name: str, field_names: List[str]) -> Dict[str, Any]:
+    """
+    Get specific field values for a company.
+
+    Convenient tool for quick lookups without SQL.
+
+    Returns:
+        {
+            "success": True,
+            "company": "XYZ Corp",
+            "values": {
+                "revenue_fy24": 1250.5,
+                "market_cap": 15000.0,
+                "ebitda_margin_fy24": 23.5
+            }
+        }
+    """
+```
+
+### Agent Workflow Implementation
+
+**Module:** `src/agent/query_agent.py`
+
+```python
+class FinancialQueryAgent:
+    def __init__(self, config: Config):
+        self.config = config
+        self.client = openai.Client(api_key=config.openai_api_key)
+        self.conversation_history = []
+        self.tools = self._initialize_tools()
+
+    def _initialize_tools(self) -> List[Dict]:
+        """Register all available function calling tools."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_database",
+                    "description": "Execute SQL query against financial database to retrieve quantitative metrics",
+                    "parameters": QueryDatabaseInput.model_json_schema()
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_documents",
+                    "description": "Search equity research documents for qualitative information",
+                    "parameters": SearchDocumentsInput.model_json_schema()
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_schema",
+                    "description": "Get schema information about available fields and synonyms",
+                    "parameters": GetSchemaInput.model_json_schema()
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_company_list",
+                    "description": "Get list of companies in the corpus with sector information",
+                    "parameters": {"type": "object", "properties": {}}
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_field_values",
+                    "description": "Get specific field values for a company",
+                    "parameters": GetFieldValuesInput.model_json_schema()
+                }
+            }
+        ]
+
+    def ask(self, question: str) -> str:
+        """
+        Process user question using function calling workflow.
+
+        Flow:
+        1. Add user question to conversation history
+        2. Call GPT-5 with available tools
+        3. If GPT-5 requests tool calls, execute them
+        4. Return tool results to GPT-5
+        5. GPT-5 synthesizes final answer
+        6. Return answer to user
+        """
+        # Add user message
+        self.conversation_history.append({
+            "role": "user",
+            "content": question
+        })
+
+        # Initial call to GPT-5
+        response = self.client.chat.completions.create(
+            model=self.config.gpt5_model,
+            messages=self.conversation_history,
+            tools=self.tools,
+            tool_choice="auto",
+            temperature=0
+        )
+
+        # Handle tool calls
+        while response.choices[0].finish_reason == "tool_calls":
+            # Execute tool calls
+            tool_results = self._execute_tool_calls(
+                response.choices[0].message.tool_calls
+            )
+
+            # Add assistant message with tool calls
+            self.conversation_history.append(response.choices[0].message)
+
+            # Add tool results
+            for tool_result in tool_results:
+                self.conversation_history.append({
+                    "role": "tool",
+                    "tool_call_id": tool_result["tool_call_id"],
+                    "content": json.dumps(tool_result["result"])
+                })
+
+            # Call GPT-5 again with tool results
+            response = self.client.chat.completions.create(
+                model=self.config.gpt5_model,
+                messages=self.conversation_history,
+                tools=self.tools,
+                tool_choice="auto",
+                temperature=0
+            )
+
+        # Get final answer
+        answer = response.choices[0].message.content
+
+        # Add assistant response to history
+        self.conversation_history.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+        return answer
+
+    def _execute_tool_calls(self, tool_calls) -> List[Dict]:
+        """Execute requested tool calls and return results."""
+        results = []
+
+        for tool_call in tool_calls:
+            function_name = tool_call.function.name
+            arguments = json.loads(tool_call.function.arguments)
+
+            # Execute the tool
+            if function_name == "query_database":
+                result = query_database(**arguments)
+            elif function_name == "search_documents":
+                result = search_documents(**arguments)
+            elif function_name == "get_schema":
+                result = get_schema(**arguments)
+            elif function_name == "get_company_list":
+                result = get_company_list(**arguments)
+            elif function_name == "get_field_values":
+                result = get_field_values(**arguments)
+            else:
+                result = {"success": False, "error": f"Unknown tool: {function_name}"}
+
+            results.append({
+                "tool_call_id": tool_call.id,
+                "result": result
+            })
+
+        return results
+
+    def clear_history(self):
+        """Clear conversation history (start new session)."""
+        self.conversation_history = []
+```
+
+### System Prompt for Agent
+
+```python
+SYSTEM_PROMPT = """You are a financial research analyst assistant. You help users query and analyze equity research reports from Indian companies.
+
+Your capabilities:
+- Query quantitative financial metrics from a structured database
+- Search qualitative information from research reports
+- Answer complex questions requiring both quantitative and qualitative data
+- Handle multi-turn conversations with context awareness
+
+Critical rules:
+1. ONLY use data from the provided corpus - never make up or infer data
+2. If data is not available, explicitly state "I don't have that information in the corpus"
+3. If a company is not in the corpus, refuse to answer about it
+4. Always cite sources (document names, SQL queries used)
+5. For ambiguous questions, ask for clarification
+6. Resolve references in multi-turn conversations ("that company", "last quarter", etc.)
+
+Available tools:
+- query_database: For quantitative metrics (revenue, profit, ratios, etc.)
+- search_documents: For qualitative info (business overview, risks, opportunities, etc.)
+- get_schema: To see what fields are available
+- get_company_list: To see which companies are in the corpus
+- get_field_values: Quick lookup of specific metrics
+
+When answering:
+- Be concise but complete
+- Include units (INR crores, percentages, etc.)
+- Cite sources (which document, which SQL query)
+- If using calculations, show your work
+"""
+```
+
+### Example Query Flows
+
+**Simple Quantitative Query:**
+```
+User: "What is the revenue of XYZ Corp for FY24?"
+
+Agent thinks: Need quantitative data
+→ Calls get_field_values(company_name="XYZ Corp", field_names=["revenue_fy24"])
+→ Receives: {"revenue_fy24": 1250.5, "unit": "INR_crore"}
+→ Responds: "XYZ Corp's revenue for FY24 was ₹1,250.5 crores."
+```
+
+**Complex Aggregation:**
+```
+User: "Top 3 companies by market cap in the technology sector"
+
+Agent thinks: Need to query and aggregate
+→ Calls query_database(sql_query="SELECT c.name, c.ticker, m.value as market_cap
+                                  FROM companies c
+                                  JOIN metrics m ON c.id = m.company_id
+                                  WHERE c.sector = 'Technology'
+                                  AND m.field_name = 'market_cap'
+                                  ORDER BY m.value DESC
+                                  LIMIT 3")
+→ Receives: List of 3 companies with market caps
+→ Responds: "Top 3 technology companies by market cap:
+            1. ABC Ltd: ₹25,000 crores
+            2. XYZ Corp: ₹15,000 crores
+            3. PQR Tech: ₹12,500 crores"
+```
+
+**Qualitative Query:**
+```
+User: "What are the key risks for ABC Ltd?"
+
+Agent thinks: Need qualitative data
+→ Calls search_documents(query="key risks challenges ABC Ltd", filter_by_company="ABC Ltd")
+→ Receives: Text passages about risks from ABC Ltd's report
+→ Responds: "According to the equity research report for ABC Ltd (page 8), the key risks are:
+            1. Regulatory changes...
+            2. Competition from...
+            3. Supply chain..."
+```
+
+**Hybrid Query:**
+```
+User: "Why did XYZ Corp's revenue drop last quarter?"
+
+Agent thinks: Need quantitative trend + qualitative explanation
+→ Calls query_database to get quarterly revenue trend
+→ Calls search_documents to find qualitative explanation of revenue changes
+→ Synthesizes both into comprehensive answer
+```
 
 ---
 
@@ -1155,7 +1973,7 @@ if __name__ == "__main__":
 
 ## Notes & Assumptions
 
-1. **OpenAI Models:** Using GPT-5 and GPT-5 Vision (2026 latest models)
+1. **OpenAI Models:** Using GPT-5 (model ID: `gpt-5`) - multimodal model with native vision capabilities
 2. **Token Usage:** Unlimited budget - prioritize accuracy over cost optimization
 3. **Scale:** Designed for 20-20,000 PDFs, currently testing with 20
 4. **Accuracy:** Grounded in source documents only, no external data
