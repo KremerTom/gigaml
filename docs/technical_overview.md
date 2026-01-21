@@ -2,7 +2,7 @@
 
 ## Overview
 
-This system implements a conversational AI agent capable of answering natural language questions about Indian equity research reports. The architecture consists of three primary components: a PDF ingestion pipeline, a hybrid storage layer (relational + vector), and a multi-turn conversational agent with function calling capabilities.
+This system implements a conversational AI agent capable of answering natural language questions about equity research reports. The architecture consists of three primary components: a PDF ingestion pipeline, a hybrid storage layer (relational + vector), and a multi-turn conversational agent with function calling capabilities.
 
 ---
 

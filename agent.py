@@ -2,7 +2,6 @@
 """Financial Research Agent - Multi-turn conversational AI with semantic search."""
 import sqlite3
 import json
-import re
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
@@ -36,53 +35,52 @@ class FinancialAgent:
             )
         else:
             self.qualitative_collection = None
+            
         self.system_prompt = """You are a financial research assistant with access ONLY to a specific corpus of Indian equity research PDFs.
 
-STRICT RULES - VIOLATIONS ARE UNACCEPTABLE:
-1. ONLY use data returned by your tools. NEVER use your own knowledge about companies, stocks, or markets.
-2. NEVER look anything up online or use web search. You have NO internet access.
-3. NEVER guess, estimate, or infer data that isn't explicitly in tool results.
-4. If a company is NOT in your database, say: "I don't have [company] in my corpus."
-5. If data is missing, say: "I don't have [specific data] for [company] in my corpus."
-6. ALWAYS cite your source: which tool returned the data.
-7. For ambiguous questions, ASK for clarification.
+STRICT RULES:
+1. ONLY use data returned by your tools. NEVER use external knowledge.
+2. If a company is NOT found, say: "I don't have [company] in my corpus."
+3. If data is missing, say: "I don't have [specific data] for [company]."
+4. ALWAYS cite your source tool.
 
-CRITICAL FOR QUALITATIVE DATA:
-- When you call get_qualitative or search_qualitative, READ THE RETURNED TEXT CAREFULLY AND COMPLETELY.
-- The text contains important facts like mergers, acquisitions, business details, risks, etc.
-- Don't just skim - extract specific facts from the content returned.
-- If search_qualitative returns matches, those matches contain the answer.
+TOOLS:
+- semantic_search: For ANY qualitative questions (business descriptions, mergers, acquisitions, risks, strategy, industry, etc.)
+- get_company_metrics: For quantitative data (prices, ratios, forecasts, shareholding)
+- get_time_series: For historical financials (P&L, Balance Sheet, Cash Flow, Ratios by period)
+- compare_companies: Compare a metric across all companies
+- query_database: Custom SQL on tables: companies, metrics, time_series, qualitative
 
-TOOLS AVAILABLE:
-- list_companies: See all companies in corpus
-- get_company_metrics: Quantitative data (prices, ratios, forecasts)
-- get_time_series: Historical financials (P&L, Balance Sheet, Cash Flow)
-- get_qualitative: Get ALL qualitative text for a company
-- search_qualitative: KEYWORD SEARCH within qualitative text (use for specific facts like mergers, risks, etc.)
-- semantic_search: AI-powered search across ALL qualitative content (best for conceptual questions)
-- compare_companies: Compare metrics across companies
-- query_database: Custom SQL queries
-
-FOR QUESTIONS ABOUT SPECIFIC FACTS (mergers, acquisitions, risks, business details):
-1. First try search_qualitative with relevant keywords
-2. If no results, try semantic_search with the question
-3. READ the returned content carefully to find the answer"""
+CRITICAL FOR SEMANTIC SEARCH:
+- Report ALL potentially relevant matches, not just the top result
+- ALSO mention companies in RELATED/ADJACENT industries (e.g., if asked about "metals", also mention cement, mining, industrial companies)
+- Structure your answer as:
+  1. Direct matches: companies directly in the requested industry
+  2. Related industries: companies in adjacent sectors that may be relevant
+- When in doubt, INCLUDE the company and explain why it might be relevant
+- Read EVERY result returned - don't filter based on narrow interpretation"""
 
     def _define_tools(self):
         return [
             {
                 "type": "function",
                 "function": {
-                    "name": "list_companies",
-                    "description": "Get list of all companies in the database with their sectors",
-                    "parameters": {"type": "object", "properties": {}}
+                    "name": "semantic_search",
+                    "description": "Search qualitative content (business descriptions, mergers, acquisitions, risks, strategy). Use for ANY non-numeric questions about companies.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Natural language question or topic"}
+                        },
+                        "required": ["query"]
+                    }
                 }
             },
             {
                 "type": "function",
                 "function": {
                     "name": "get_company_metrics",
-                    "description": "Get all metrics for a company (market data, forecasts, shareholding)",
+                    "description": "Get quantitative metrics for a company: prices, market cap, ratios, forecasts, shareholding",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -96,12 +94,12 @@ FOR QUESTIONS ABOUT SPECIFIC FACTS (mergers, acquisitions, risks, business detai
                 "type": "function",
                 "function": {
                     "name": "get_time_series",
-                    "description": "Get financial statement time series (P&L, Balance Sheet, Cash Flow, Ratios)",
+                    "description": "Get financial statement time series: P&L, Balance Sheet, Cash Flow, Ratios",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "company_name": {"type": "string", "description": "Company name"},
-                            "table_name": {"type": "string", "enum": ["annual_pnl", "quarterly_pnl", "balance_sheet", "cash_flow", "ratios"], "description": "Which financial statement"}
+                            "table_name": {"type": "string", "enum": ["annual_pnl", "quarterly_pnl", "balance_sheet", "cash_flow", "ratios"], "description": "Financial statement type"}
                         },
                         "required": ["company_name", "table_name"]
                     }
@@ -110,8 +108,23 @@ FOR QUESTIONS ABOUT SPECIFIC FACTS (mergers, acquisitions, risks, business detai
             {
                 "type": "function",
                 "function": {
+                    "name": "compare_companies",
+                    "description": "Compare a specific metric across all companies in corpus",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "metric_name": {"type": "string", "description": "Metric to compare (e.g., 'market_cap', 'target_price', 'pe_ratio')"},
+                            "sort_order": {"type": "string", "enum": ["asc", "desc"], "description": "Sort order"}
+                        },
+                        "required": ["metric_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "query_database",
-                    "description": "Run a custom SQL query. Tables: companies, metrics, time_series, qualitative",
+                    "description": "Run custom SQL query. Tables: companies (name, sector), metrics (field_name, value, unit), time_series (table_name, metric, period, value), qualitative (chunk_type, content)",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -120,79 +133,41 @@ FOR QUESTIONS ABOUT SPECIFIC FACTS (mergers, acquisitions, risks, business detai
                         "required": ["sql"]
                     }
                 }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_qualitative",
-                    "description": "Get ALL qualitative text (business highlights, analysis) for a company. Returns full text - read it carefully.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "company_name": {"type": "string", "description": "Company name"}
-                        },
-                        "required": ["company_name"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_qualitative",
-                    "description": "KEYWORD SEARCH within qualitative text. Use for specific facts like mergers, acquisitions, risks. Returns matching sentences.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "company_name": {"type": "string", "description": "Company name (optional - omit to search all)"},
-                            "keywords": {"type": "string", "description": "Keywords to search for (e.g., 'merger', 'Allahabad', 'risk')"}
-                        },
-                        "required": ["keywords"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "semantic_search",
-                    "description": "AI-powered semantic search across ALL qualitative content. Best for conceptual questions.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {"type": "string", "description": "Natural language question or topic to search for"}
-                        },
-                        "required": ["query"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "compare_companies",
-                    "description": "Compare a specific metric across all companies",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "metric_name": {"type": "string", "description": "Metric to compare"},
-                            "sort_order": {"type": "string", "enum": ["asc", "desc"], "description": "Sort order"}
-                        },
-                        "required": ["metric_name"]
-                    }
-                }
-            },
-            {
-                "type": "function", 
-                "function": {
-                    "name": "get_schema",
-                    "description": "Get database schema - list of tables and available metrics",
-                    "parameters": {"type": "object", "properties": {}}
-                }
             }
         ]
 
     # Tool implementations
-    def list_companies(self):
-        rows = self.db.execute("SELECT name, sector FROM companies").fetchall()
-        return [{"name": r["name"], "sector": r["sector"]} for r in rows]
+    def semantic_search(self, query: str):
+        """Semantic search using ChromaDB vector embeddings."""
+        if not self.qualitative_collection:
+            return {"error": "Vector database not available. Run ingestion first."}
+        
+        try:
+            results = self.qualitative_collection.query(
+                query_texts=[query],
+                n_results=10
+            )
+            
+            if not results["documents"] or not results["documents"][0]:
+                return {"matches": [], "note": "No matches found"}
+            
+            matches = []
+            for i, doc in enumerate(results["documents"][0]):
+                metadata = results["metadatas"][0][i] if results["metadatas"] else {}
+                distance = results["distances"][0][i] if results["distances"] else None
+                matches.append({
+                    "company": metadata.get("company", "unknown"),
+                    "content": doc,
+                    "relevance": f"{1 - distance:.2f}" if distance else "?"
+                })
+            
+            return {
+                "query": query,
+                "matches": matches,
+                "note": "READ the content above to find your answer"
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
     def get_company_metrics(self, company_name: str):
         company = self.db.execute(
@@ -200,7 +175,7 @@ FOR QUESTIONS ABOUT SPECIFIC FACTS (mergers, acquisitions, risks, business detai
             (f"%{company_name}%",)
         ).fetchone()
         if not company:
-            return {"error": f"Company '{company_name}' not found"}
+            return {"error": f"Company '{company_name}' not found. Use query_database to list all companies."}
         
         metrics = self.db.execute(
             "SELECT field_name, value, unit, time_period FROM metrics WHERE company_id = ?",
@@ -235,118 +210,6 @@ FOR QUESTIONS ABOUT SPECIFIC FACTS (mergers, acquisitions, risks, business detai
         
         return {"company": company["name"], "table": table_name, "data": data}
 
-    def query_database(self, sql: str):
-        try:
-            if any(kw in sql.upper() for kw in ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER"]):
-                return {"error": "Only SELECT queries allowed"}
-            rows = self.db.execute(sql).fetchall()
-            return [dict(r) for r in rows[:50]]
-        except Exception as e:
-            return {"error": str(e)}
-
-    def get_qualitative(self, company_name: str):
-        company = self.db.execute(
-            "SELECT id, name FROM companies WHERE name LIKE ?",
-            (f"%{company_name}%",)
-        ).fetchone()
-        if not company:
-            return {"error": f"Company '{company_name}' not found"}
-        
-        rows = self.db.execute(
-            "SELECT chunk_type, content, page_num FROM qualitative WHERE company_id = ?",
-            (company["id"],)
-        ).fetchall()
-        
-        return {
-            "company": company["name"],
-            "sections": [{"type": r["chunk_type"], "content": r["content"], "page": r["page_num"]} for r in rows],
-            "note": "READ THE CONTENT ABOVE CAREFULLY - it contains important facts about the company"
-        }
-
-    def search_qualitative(self, keywords: str, company_name: str = None):
-        """Search qualitative text for keywords."""
-        # Build query
-        if company_name:
-            company = self.db.execute(
-                "SELECT id, name FROM companies WHERE name LIKE ?",
-                (f"%{company_name}%",)
-            ).fetchone()
-            if not company:
-                return {"error": f"Company '{company_name}' not found"}
-            rows = self.db.execute(
-                "SELECT c.name as company, q.chunk_type, q.content FROM qualitative q JOIN companies c ON q.company_id = c.id WHERE q.company_id = ?",
-                (company["id"],)
-            ).fetchall()
-        else:
-            rows = self.db.execute(
-                "SELECT c.name as company, q.chunk_type, q.content FROM qualitative q JOIN companies c ON q.company_id = c.id"
-            ).fetchall()
-        
-        # Search for keywords in content
-        keywords_list = [k.strip().lower() for k in keywords.split(",")]
-        matches = []
-        
-        for row in rows:
-            content = row["content"] or ""
-            content_lower = content.lower()
-            
-            # Check if any keyword matches
-            for kw in keywords_list:
-                if kw in content_lower:
-                    # Extract sentences containing the keyword
-                    sentences = re.split(r'[.!?]', content)
-                    for sentence in sentences:
-                        if kw in sentence.lower():
-                            matches.append({
-                                "company": row["company"],
-                                "type": row["chunk_type"],
-                                "match": sentence.strip(),
-                                "keyword": kw
-                            })
-        
-        if not matches:
-            return {"matches": [], "note": f"No matches found for keywords: {keywords}"}
-        
-        return {
-            "matches": matches[:20],  # Limit results
-            "note": "READ THESE MATCHES - they contain the information you're looking for"
-        }
-
-    def semantic_search(self, query: str):
-        """Semantic search using ChromaDB vector embeddings."""
-        if not self.qualitative_collection:
-            return {"error": "Vector database not available. Run ingestion first."}
-        
-        try:
-            # Query ChromaDB - it handles embedding automatically
-            results = self.qualitative_collection.query(
-                query_texts=[query],
-                n_results=5
-            )
-            
-            if not results["documents"] or not results["documents"][0]:
-                return {"matches": [], "note": "No semantic matches found"}
-            
-            matches = []
-            for i, doc in enumerate(results["documents"][0]):
-                metadata = results["metadatas"][0][i] if results["metadatas"] else {}
-                distance = results["distances"][0][i] if results["distances"] else None
-                matches.append({
-                    "company": metadata.get("company", "unknown"),
-                    "type": metadata.get("type", "unknown"),
-                    "page": metadata.get("page", "?"),
-                    "content": doc[:1000],  # Limit for display
-                    "relevance": f"{1 - distance:.2f}" if distance else "?"
-                })
-            
-            return {
-                "query": query,
-                "matches": matches,
-                "note": "READ THESE MATCHES CAREFULLY - they contain semantically relevant information"
-            }
-        except Exception as e:
-            return {"error": str(e)}
-
     def compare_companies(self, metric_name: str, sort_order: str = "desc"):
         order = "DESC" if sort_order == "desc" else "ASC"
         rows = self.db.execute(f"""
@@ -359,37 +222,26 @@ FOR QUESTIONS ABOUT SPECIFIC FACTS (mergers, acquisitions, risks, business detai
         
         return [{"company": r["name"], "sector": r["sector"], "value": r["value"], "unit": r["unit"]} for r in rows]
 
-    def get_schema(self):
-        metrics = self.db.execute("SELECT DISTINCT field_name FROM metrics ORDER BY field_name").fetchall()
-        ts_tables = self.db.execute("SELECT DISTINCT table_name FROM time_series").fetchall()
-        ts_metrics = self.db.execute("SELECT DISTINCT metric FROM time_series ORDER BY metric").fetchall()
-        
-        return {
-            "tables": ["companies", "metrics", "time_series", "qualitative"],
-            "metric_fields": [r[0] for r in metrics],
-            "time_series_tables": [r[0] for r in ts_tables],
-            "time_series_metrics": [r[0] for r in ts_metrics][:30]
-        }
+    def query_database(self, sql: str):
+        try:
+            if any(kw in sql.upper() for kw in ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER"]):
+                return {"error": "Only SELECT queries allowed"}
+            rows = self.db.execute(sql).fetchall()
+            return [dict(r) for r in rows[:50]]
+        except Exception as e:
+            return {"error": str(e)}
 
     def _execute_tool(self, name: str, args: dict):
-        if name == "list_companies":
-            return self.list_companies()
+        if name == "semantic_search":
+            return self.semantic_search(args["query"])
         elif name == "get_company_metrics":
             return self.get_company_metrics(args["company_name"])
         elif name == "get_time_series":
             return self.get_time_series(args["company_name"], args["table_name"])
-        elif name == "query_database":
-            return self.query_database(args["sql"])
-        elif name == "get_qualitative":
-            return self.get_qualitative(args["company_name"])
-        elif name == "search_qualitative":
-            return self.search_qualitative(args["keywords"], args.get("company_name"))
-        elif name == "semantic_search":
-            return self.semantic_search(args["query"])
         elif name == "compare_companies":
             return self.compare_companies(args["metric_name"], args.get("sort_order", "desc"))
-        elif name == "get_schema":
-            return self.get_schema()
+        elif name == "query_database":
+            return self.query_database(args["sql"])
         return {"error": "Unknown tool"}
 
     def ask(self, question: str) -> str:
@@ -449,8 +301,8 @@ def main():
         return
     
     agent = FinancialAgent()
-    companies = agent.list_companies()
-    print(f"Loaded {len(companies)} companies")
+    count = agent.db.execute("SELECT COUNT(*) FROM companies").fetchone()[0]
+    print(f"Loaded {count} companies")
     print("\nCommands: 'quit' to exit, 'reset' to clear context")
     print("-" * 50)
     
