@@ -49,8 +49,9 @@ Building a multi-turn conversational AI agent that answers financial research qu
 - Headers and metadata
 
 ### Out of Scope
-- Charts and visual graphics
+- Charts and visual graphics (skip chart interpretation, extract surrounding text only)
 - Disclaimer pages (ignore, assume identical across PDFs)
+- Images within PDFs that are decorative or logos
 
 ## Architecture Design
 
