@@ -2,54 +2,30 @@
 
 **Last Updated:** January 21, 2026
 
-## Current Models
+## Selected Model for This Project: GPT-5
 
-### GPT-5.2 (Latest Flagship Model)
-**Released:** December 2025
+### GPT-5 (Our Model)
+**API Model ID:** `gpt-5`
 
-GPT-5.2 is OpenAI's flagship model for coding and agentic tasks across industries, replacing GPT-5.1.
+GPT-5 is a solid foundation model with multimodal capabilities that we're using for all tasks in this project.
 
-#### API Model IDs
+#### Key Features
 
-- **`gpt-5.2`** - Main model (GPT-5.2 Thinking variant)
-- **`gpt-5.2-chat-latest`** - GPT-5.2 Instant variant (powering ChatGPT)
-- **`gpt-5.2-pro`** - GPT-5.2 Pro variant (uses more compute for harder problems)
+**Multimodal Capabilities:** GPT-5 has native vision and text understanding - no separate "vision" model needed.
 
-#### Model Variants
+**Vision Capabilities:**
+- Strong chart and table understanding for financial documents
+- Can interpret dashboards, product screenshots, technical diagrams
+- Enhanced spatial understanding of document layout
+- Excellent for PDF page analysis
 
-1. **GPT-5.2 Instant** (`gpt-5.2-chat-latest`)
-   - Fast responses for real-time applications
-   - Optimized for chat interactions
-
-2. **GPT-5.2 Thinking** (`gpt-5.2`)
-   - Deep reasoning capabilities
-   - Supports reasoning.effort levels: none (default), low, medium, high, xhigh
-   - New in 5.2: xhigh reasoning level, concise reasoning summaries
-
-3. **GPT-5.2 Pro** (`gpt-5.2-pro`)
-   - Highest performance tier
-   - Uses more compute to provide consistently better answers
-
-#### Vision Capabilities
-
-**GPT-5.2 has native multimodal capabilities** - no separate "vision" model needed.
-
-Key vision features:
-- **Strongest vision model yet** - error rates cut roughly in half on chart reasoning and software interface understanding
-- **Enhanced spatial understanding** - stronger grasp of how elements are positioned within images
-- **Chart and dashboard analysis** - accurately interprets dashboards, product screenshots, technical diagrams, visual reports
-- **GUI understanding** - 86.3% accuracy on ScreenSpot-Pro benchmark (up from 64.2% in GPT-5.1)
-- **Stronger vision + text fusion** - better integration of visual and textual information
-
-#### Reasoning Features
-
-- **reasoning.effort** parameter supports: `none`, `low`, `medium`, `high`, `xhigh`
-- **Context management** - new compaction features for long conversations
-- **Client-side compaction** - `/responses/compact` endpoint to shrink context in long-running conversations
+**Reasoning:**
+- Good reasoning for complex financial queries
+- Supports structured thinking about multi-step problems
 
 #### Function Calling (Tools)
 
-GPT-5 supports **function calling** (also called "tools" in the API), allowing the model to:
+**GPT-5 supports function calling** (also called "tools" in the API), allowing the model to:
 - Call external functions/APIs with structured arguments
 - Receive structured results back
 - Chain multiple function calls together
@@ -69,7 +45,7 @@ GPT-5 supports **function calling** (also called "tools" in the API), allowing t
 
 #### Structured Outputs
 
-GPT-5 supports **structured outputs** via `response_format` parameter:
+**GPT-5 supports structured outputs** via `response_format` parameter:
 - Guarantee JSON schema compliance
 - Use Pydantic models to define output structure
 - Perfect for data extraction from PDFs
@@ -77,82 +53,73 @@ GPT-5 supports **structured outputs** via `response_format` parameter:
 
 #### Pricing (as of January 2026)
 
-- **Input tokens:** $1.75 per 1M tokens
-- **Output tokens:** $14 per 1M tokens
-- **Cached inputs:** 90% discount on cached input tokens
+- **Input tokens:** ~$1.50-2.00 per 1M tokens (varies)
+- **Output tokens:** ~$10-15 per 1M tokens (varies)
+- **Cached inputs:** Significant discount on cached input tokens
 
-## Specialized Models
-
-### GPT-5.2-Codex
-**Released:** January 2026 (now default for Codex API)
-
-- Version of GPT-5.2 optimized for agentic coding tasks
-- Enhanced code understanding and generation
-- Better screenshot and technical diagram interpretation
-
-### GPT-5.1-Codex-max
-**Released:** January 2026
-
-- Most intelligent coding model
-- Optimized for long-horizon, agentic coding tasks
-- Available via Responses API
-
-### o3-mini
-**Released:** January 2026
-
-- Small reasoning model
-- Optimized for science, math, and coding tasks
-- More cost-effective for specific use cases
-
-## GPT-5 (Base Model)
-
-**API Model ID:** `gpt-5`
-
-- Solid foundation model with multimodal capabilities
-- Supports text and vision inputs
-- Available and actively supported
-- Good balance of performance and cost
-
-## Deprecated Models
-
-- **GPT-4 family** - Still available but superseded by GPT-5 family
-
-## For This Project
-
-### Selected Model: GPT-5
+## Why GPT-5 for This Project
 
 For the Financial Research AI Agent, we are using **`gpt-5`** for all tasks:
 
-1. **Vision + Data Extraction:** `gpt-5`
-   - Native vision capabilities for analyzing PDF images
-   - Strong chart/table understanding
-   - Structured outputs support
+**Vision + Data Extraction:**
+- Native vision capabilities for analyzing PDF images
+- Strong chart/table understanding
+- Structured outputs support
 
-2. **Text Processing & Schema Evolution:** `gpt-5`
-   - Same model for consistency
-   - No need for separate text model
+**Text Processing & Schema Evolution:**
+- Excellent text understanding
+- Can identify synonyms and field relationships
+- Consistent performance
 
-3. **Query Workflow (Runtime):** `gpt-5`
-   - Good reasoning for complex financial queries
-   - Multimodal capabilities for hybrid queries
+**Query Workflow (Runtime):**
+- Good reasoning for complex financial queries
+- Multimodal capabilities for hybrid queries
+- Function calling support for tool use
 
-**Why GPT-5 (not 5.2 or Pro)?**
+**Why GPT-5?**
 - Proven stability and reliability
 - Cost-effective for high-volume processing
 - Sufficient capabilities for equity research document analysis
+- Native multimodal support (no separate vision model needed)
 - Can upgrade to newer models later if needed
+
+## Newer Models Available (Not Currently Used)
+
+### GPT-5.2 Family
+**Released:** December 2025
+
+OpenAI's newest flagship models with enhanced capabilities:
+- **`gpt-5.2`** - Main model with thinking capabilities
+- **`gpt-5.2-chat-latest`** - Instant variant (faster responses)
+- **`gpt-5.2-pro`** - Pro variant (more compute for harder problems)
+
+**New features in 5.2:**
+- Enhanced reasoning with `xhigh` reasoning level
+- Improved vision capabilities
+- Better chart and dashboard analysis
+- Context compaction features
+
+**Why not using it yet:**
+- GPT-5 is sufficient for our needs
+- Want proven stability before upgrading
+- Can migrate later if needed
+
+### Other Specialized Models
+- **GPT-5.2-Codex** - Optimized for coding tasks
+- **o3-mini** - Small reasoning model for science/math/coding
 
 ## API Documentation
 
 - **Official Docs:** https://platform.openai.com/docs/models/
-- **GPT-5.2 Docs:** https://platform.openai.com/docs/models/gpt-5.2
-- **Usage Guide:** https://platform.openai.com/docs/guides/latest-model
+- **GPT-5 Docs:** https://platform.openai.com/docs/models/gpt-5
+- **Usage Guide:** https://platform.openai.com/docs/guides/
 - **Changelog:** https://platform.openai.com/docs/changelog
 
 ## Notes
 
-- All GPT-5.2 variants support **multimodal input** (text + images)
-- No separate "vision" model exists - vision is built into GPT-5.2
-- Models support **structured outputs** via `response_format` parameter
-- **Context window:** Documentation doesn't specify, but likely 128K+ tokens
-- All models available immediately to API users as of January 2026
+- GPT-5 supports **multimodal input** (text + images)
+- No separate "vision" model needed - vision is built into GPT-5
+- Supports **structured outputs** via `response_format` parameter
+- Supports **function calling** (tools) for structured data retrieval
+- **Context window:** Large (likely 128K+ tokens)
+- Available immediately to API users
