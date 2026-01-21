@@ -1,0 +1,212 @@
+Calling API (regular JSON)...
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_exceptions.py", line 10, in map_exceptions
+    yield
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_backends/sync.py", line 28, in read
+    return self._sock.recv(max_bytes)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1259, in recv
+    return self.read(buflen)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1132, in read
+    return self._sslobj.read(len)
+TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 60, in map_httpcore_exceptions
+    yield
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 218, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 262, in handle_request
+    raise exc
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 245, in handle_request
+    response = connection.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection.py", line 96, in handle_request
+    return self._connection.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 121, in handle_request
+    raise exc
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 99, in handle_request
+    ) = self._receive_response_headers(**kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 164, in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 200, in _receive_event
+    data = self._network_stream.read(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_backends/sync.py", line 26, in read
+    with map_exceptions(exc_map):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1003, in _request
+    response = self._client.send(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 901, in send
+    response = self._send_handling_auth(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 929, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 966, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 1002, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 217, in handle_request
+    with map_httpcore_exceptions():
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 77, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout: The read operation timed out
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_exceptions.py", line 10, in map_exceptions
+    yield
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_backends/sync.py", line 28, in read
+    return self._sock.recv(max_bytes)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1259, in recv
+    return self.read(buflen)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1132, in read
+    return self._sslobj.read(len)
+TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 60, in map_httpcore_exceptions
+    yield
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 218, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 262, in handle_request
+    raise exc
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 245, in handle_request
+    response = connection.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection.py", line 96, in handle_request
+    return self._connection.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 121, in handle_request
+    raise exc
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 99, in handle_request
+    ) = self._receive_response_headers(**kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 164, in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 200, in _receive_event
+    data = self._network_stream.read(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_backends/sync.py", line 26, in read
+    with map_exceptions(exc_map):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1003, in _request
+    response = self._client.send(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 901, in send
+    response = self._send_handling_auth(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 929, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 966, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 1002, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 217, in handle_request
+    with map_httpcore_exceptions():
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 77, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout: The read operation timed out
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_exceptions.py", line 10, in map_exceptions
+    yield
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_backends/sync.py", line 28, in read
+    return self._sock.recv(max_bytes)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1259, in recv
+    return self.read(buflen)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/ssl.py", line 1132, in read
+    return self._sslobj.read(len)
+TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 60, in map_httpcore_exceptions
+    yield
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 218, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 262, in handle_request
+    raise exc
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection_pool.py", line 245, in handle_request
+    response = connection.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/connection.py", line 96, in handle_request
+    return self._connection.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 121, in handle_request
+    raise exc
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 99, in handle_request
+    ) = self._receive_response_headers(**kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 164, in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_sync/http11.py", line 200, in _receive_event
+    data = self._network_stream.read(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_backends/sync.py", line 26, in read
+    with map_exceptions(exc_map):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1003, in _request
+    response = self._client.send(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 901, in send
+    response = self._send_handling_auth(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 929, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 966, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_client.py", line 1002, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 217, in handle_request
+    with map_httpcore_exceptions():
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/httpx/_transports/default.py", line 77, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/tomkremer/Documents/Jobs/GigaML/gigaml/tmp/test_json.py", line 25, in <module>
+    response = client.chat.completions.create(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_utils/_utils.py", line 279, in wrapper
+    return func(*args, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 879, in create
+    return self._post(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1290, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 967, in request
+    return self._request(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1012, in _request
+    return self._retry_request(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1105, in _retry_request
+    return self._request(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1012, in _request
+    return self._retry_request(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1105, in _retry_request
+    return self._request(
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/openai/_base_client.py", line 1022, in _request
+    raise APITimeoutError(request=request) from err
+openai.APITimeoutError: Request timed out.

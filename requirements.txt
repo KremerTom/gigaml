@@ -1,5 +1,16 @@
+# PDF Processing
 pdf2image>=1.16.0
-pillow>=10.0.0
+Pillow>=10.0.0
+
+# AI/ML
 openai>=1.54.0
-python-dotenv>=1.0.0
 pydantic>=2.0.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# System dependencies note:
+# pdf2image requires poppler-utils to be installed:
+# - macOS: brew install poppler
+# - Ubuntu/Debian: sudo apt-get install poppler-utils
+# - Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases/

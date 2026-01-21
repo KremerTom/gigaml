@@ -1,0 +1,7 @@
+Found 12 images to process
+Starting parallel extraction with 12 workers...
+============================================================
+[START] 32585599286500cb_page_1.png
+[START] 32585599286500cb_page_2.png
+[START] 32585599286500cb_page_3.png
+[START] 32585599286500cb_page_4.png
